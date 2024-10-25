@@ -26,10 +26,10 @@ import (
 func TestMakeHandler(t *testing.T) {
 	registryConfig := RegistryConfig{
 		// the v2 test below tests being redirected to k8s.gcr.io as that one doesn't have UpstreamRegistryPath
-		UpstreamRegistryEndpoint: "https://us.gcr.io",
-		UpstreamRegistryPath:     "k8s-artifacts-prod",
-		InfoURL:                  "https://github.com/kubernetes/k8s.io/tree/main/registry.k8s.io",
-		PrivacyURL:               "https://www.linuxfoundation.org/privacy-policy/",
+		UpstreamGCPEndpoint:  "https://gcr.io",
+		UpstreamRegistryPath: "k8s-artifacts-prod",
+		InfoURL:              "https://github.com/kubernetes/k8s.io/tree/main/registry.k8s.io",
+		PrivacyURL:           "https://www.linuxfoundation.org/privacy-policy/",
 	}
 	handler := MakeHandler(registryConfig)
 	testCases := []struct {
@@ -153,10 +153,10 @@ func (f *fakeBlobsChecker) BlobExists(blobURL string) bool {
 
 func TestMakeV2Handler(t *testing.T) {
 	registryConfig := RegistryConfig{
-		UpstreamRegistryEndpoint: "https://k8s.gcr.io",
-		UpstreamRegistryPath:     "",
-		InfoURL:                  "https://github.com/kubernetes/k8s.io/tree/main/registry.k8s.io",
-		PrivacyURL:               "https://www.linuxfoundation.org/privacy-policy/",
+		UpstreamGCPEndpoint:  "https://k8s.gcr.io",
+		UpstreamRegistryPath: "",
+		InfoURL:              "https://github.com/kubernetes/k8s.io/tree/main/registry.k8s.io",
+		PrivacyURL:           "https://www.linuxfoundation.org/privacy-policy/",
 	}
 	blobs := fakeBlobsChecker{
 		knownURLs: map[string]bool{

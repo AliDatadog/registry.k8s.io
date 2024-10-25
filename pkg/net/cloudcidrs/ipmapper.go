@@ -16,26 +16,114 @@ limitations under the License.
 
 package cloudcidrs
 
-import "k8s.io/registry.k8s.io/pkg/net/cidrs"
+import (
+	"net/netip"
+	"os"
+	"path/filepath"
+
+	"k8s.io/registry.k8s.io/pkg/net/cidrs"
+)
+
+// AWS cloud
+const AWS = "AWS"
+
+// GCP cloud
+const GCP = "GCP"
+
+// Azure cloud
+const AZ = "AZ"
+
+type regionPrefixMapper map[string][]netip.Prefix
 
 // NewIPMapper returns cidrs.IPMapper populated with cloud region info
 // for the clouds we have resources for, currently GCP and AWS
 func NewIPMapper() cidrs.IPMapper[IPInfo] {
 	t := cidrs.NewTrieMap[IPInfo]()
-	for info, cidrs := range regionToRanges {
-		for _, cidr := range cidrs {
-			t.Insert(cidr, info)
+	dataDir := os.Getenv("DATA_DIR")
+	if dataDir == "" {
+		dataDir = "./data"
+	}
+	// read in data
+	awsRaw := mustReadFile(filepath.Join(dataDir, "aws-ip-ranges.json"))
+	gcpRaw := mustReadFile(filepath.Join(dataDir, "gcp-cloud.json"))
+	azRaw := mustReadFile(filepath.Join(dataDir, "azure-cloud.json"))
+	// parse raw AWS IP range data
+	awsRTP, err := parseAWS(awsRaw)
+	if err != nil {
+		panic(err)
+	}
+	// parse GCP IP range data
+	gcpRTP, err := parseGCP(gcpRaw)
+	if err != nil {
+		panic(err)
+	}
+	azRTP, err := parseAZ(azRaw)
+	if err != nil {
+		panic(err)
+	}
+
+	for region, prefixes := range awsRTP {
+		for _, prefix := range prefixes {
+			t.Insert(prefix, IPInfo{Region: region, Cloud: AWS})
+		}
+	}
+	for region, prefixes := range gcpRTP {
+		for _, prefix := range prefixes {
+			t.Insert(prefix, IPInfo{Region: region, Cloud: GCP})
+		}
+	}
+	for region, prefixes := range azRTP {
+		for _, prefix := range prefixes {
+			t.Insert(prefix, IPInfo{Region: region, Cloud: AZ})
 		}
 	}
 	return t
 }
 
 // AllIPInfos returns a slice of all known results that a NewIPMapper could
-// return
+// return for testing purposes
 func AllIPInfos() []IPInfo {
-	r := make([]IPInfo, 0, len(regionToRanges))
-	for v := range regionToRanges {
-		r = append(r, v)
+	dataDir := os.Getenv("DATA_DIR")
+	if dataDir == "" {
+		dataDir = "./data"
 	}
-	return r
+
+	// read in data
+	awsRaw := mustReadFile(filepath.Join(dataDir, "aws-ip-ranges.json"))
+	gcpRaw := mustReadFile(filepath.Join(dataDir, "gcp-cloud.json"))
+	azRaw := mustReadFile(filepath.Join(dataDir, "azure-cloud.json"))
+	// parse raw AWS IP range data
+	awsRTP, err := parseAWS(awsRaw)
+	if err != nil {
+		panic(err)
+	}
+	// parse GCP IP range data
+	gcpRTP, err := parseGCP(gcpRaw)
+	if err != nil {
+		panic(err)
+	}
+	azRTP, err := parseAZ(azRaw)
+	if err != nil {
+		panic(err)
+	}
+
+	var allIPInfos []IPInfo
+	for region := range awsRTP {
+		allIPInfos = append(allIPInfos, IPInfo{Region: region, Cloud: AWS})
+	}
+	for region := range gcpRTP {
+		allIPInfos = append(allIPInfos, IPInfo{Region: region, Cloud: GCP})
+	}
+	for region := range azRTP {
+		allIPInfos = append(allIPInfos, IPInfo{Region: region, Cloud: AZ})
+	}
+	return allIPInfos
+}
+
+func mustReadFile(filePath string) string {
+	contents, err := os.ReadFile(filePath)
+	if err != nil {
+		panic(err)
+	}
+	return string(contents)
 }

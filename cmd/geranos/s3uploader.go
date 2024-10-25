@@ -55,7 +55,8 @@ type s3Uploader struct {
 }
 
 func newS3Uploader(dryRun bool) (*s3Uploader, error) {
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithRegion("eu-west-3"))
 	if err != nil {
 		return nil, err
 	}
@@ -181,10 +182,10 @@ func (s *s3Uploader) copyToS3(bucket, key string, layer imageBlob) error {
 		uploadInput.ChecksumSHA256 = aws.String(base64.StdEncoding.EncodeToString(b))
 	}
 	// skip actually uploading if this is a dry-run, otherwise finally upload
-	klog.Infof("Uploading: %s", key)
 	if s.dryRun {
 		return nil
 	}
+	klog.Infof("Uploading: %s", key)
 	_, err = s.uploader.Upload(context.TODO(), uploadInput)
 	return err
 }

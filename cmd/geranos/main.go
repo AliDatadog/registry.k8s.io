@@ -44,10 +44,10 @@ func Main() {
 func Run(_ []string) error {
 	// one of the backing registries for registry.k8s.io
 	// TODO: make configurable later
-	const sourceRegistry = "us-central1-docker.pkg.dev/k8s-artifacts-prod/images"
+	const sourceRegistry = "eu.gcr.io/datadoghq"
 
 	// TODO: make configurable later
-	const s3Bucket = "prod-registry-k8s-io-us-east-2"
+	const s3Bucket = "aliregistry"
 
 	// 80*60s = 4800 RPM, below our current 5000 RPM per-user limit on the registry
 	// Even with the host node making other registry API calls
@@ -62,13 +62,14 @@ func Run(_ []string) error {
 		return err
 	}
 
+	klog.Infof("Starting")
 	// copy layers from all images in the repo
 	// TODO: print some progress logs at lower frequency instead of logging each image
 	// We will punt this temporarily, as we're about to refactor how this works anyhow
 	// to avoid fetching manifests for images we've already uploaded
 	err = WalkImageLayersGCP(registryRateLimit, repo,
 		func(ref name.Reference, layers []v1.Layer) error {
-			klog.Infof("Processing image: %s", ref.String())
+			// klog.Infof("Processing image: %s", ref.String())
 			return s3Uploader.UploadImage(s3Bucket, ref, layers, crane.WithTransport(registryRateLimit))
 		},
 		func(imageHash string) bool {

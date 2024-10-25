@@ -14,6 +14,12 @@ the rest of the community infra deployments, but primarily
 For publishing to registry.k8s.io, refer to [the docs][publishing] at in k8s.io 
 under `registry.k8s.io/`.
 
+## Build archeio image
+
+```bash
+ docker buildx build --platform linux/arm64,linux/amd64 -t tag --push .
+```
+
 ## Stability
 
 registry.k8s.io is GA and we ask that all users migrate from k8s.gcr.io as

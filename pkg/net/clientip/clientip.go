@@ -17,11 +17,9 @@ limitations under the License.
 package clientip
 
 import (
-	"fmt"
 	"net"
 	"net/http"
 	"net/netip"
-	"strings"
 )
 
 // Get gets the client IP for an http.Request
@@ -67,13 +65,13 @@ func Get(r *http.Request) (netip.Addr, error) {
 	//
 	// we want the contents between the second to last comma and the last comma
 	// or if only one comma between the start of the string and the last comma
-	keys := strings.FieldsFunc(rawXFwdFor, func(r rune) bool {
-		return r == ',' || r == ' '
-	})
-	// there should be at least two values: <client-ip>,<load-balancer-ip>
-	if len(keys) < 2 {
-		return netip.Addr{}, fmt.Errorf("invalid X-Forwarded-For value: %s", rawXFwdFor)
-	}
-	// normal case, we expect the client-ip to be 2 from the end
-	return netip.ParseAddr(keys[len(keys)-2])
+	//keys := strings.FieldsFunc(rawXFwdFor, func(r rune) bool {
+	//	return r == ',' || r == ' '
+	//})
+	//// there should be at least two values: <client-ip>,<load-balancer-ip>
+	//if len(keys) < 2 {
+	//	return netip.Addr{}, fmt.Errorf("invalid X-Forwarded-For value: %s", rawXFwdFor)
+	//}
+	//// normal case, we expect the client-ip to be 2 from the end
+	return netip.ParseAddr(rawXFwdFor)
 }
