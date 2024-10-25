@@ -14,13 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# wrapper script so we can go:generate with this tool
-
 set -o errexit -o nounset -o pipefail
 
-SELF_DIR="$(dirname "${BASH_SOURCE[0]}")"
-REPO_ROOT="$(cd "${SELF_DIR}/../../../../../.." && pwd -P)"
-BIN_PATH="${REPO_ROOT}/bin/ranges2go"
+# cd to self
+cd "$(dirname "${BASH_SOURCE[0]}")"
 
-go build -o "${BIN_PATH}" "${SELF_DIR}"
-"${BIN_PATH}" "$@"
+# fetch data for each supported cloud
+curl -Lo 'data/aws-ip-ranges.json' 'https://ip-ranges.amazonaws.com/ip-ranges.json'
+curl -Lo 'data/gcp-cloud.json' 'https://www.gstatic.com/ipranges/cloud.json'
+curl -Lo 'data/azure-cloud.json' 'https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_20250804.json'

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package cloudcidrs
 
 import (
 	"encoding/json"
@@ -24,7 +24,7 @@ import (
 
 // parseAWS parses raw AWS IP ranges JSON data
 // and processes it to a regionsToPrefixes map
-func parseAWS(raw string) (regionsToPrefixes, error) {
+func parseAWS(raw string) (regionPrefixMapper, error) {
 	parsed, err := parseAWSIPRangesJSON([]byte(raw))
 	if err != nil {
 		return nil, err
@@ -68,9 +68,9 @@ func parseAWSIPRangesJSON(rawJSON []byte) (*AWSIPRangesJSON, error) {
 }
 
 // awsRegionsToPrefixesFromData processes the raw unmarshalled JSON into regionsToPrefixes map
-func awsRegionsToPrefixesFromData(data *AWSIPRangesJSON) (regionsToPrefixes, error) {
+func awsRegionsToPrefixesFromData(data *AWSIPRangesJSON) (regionPrefixMapper, error) {
 	// convert from AWS published structure to a map by region, parse Prefixes
-	rtp := regionsToPrefixes{}
+	rtp := regionPrefixMapper{}
 	for _, prefix := range data.Prefixes {
 		region := prefix.Region
 		ipPrefix, err := netip.ParsePrefix(prefix.IPPrefix)

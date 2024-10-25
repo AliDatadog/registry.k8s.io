@@ -19,6 +19,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"golang.org/x/sync/errgroup"
 
@@ -50,11 +51,16 @@ func WalkImageLayersGCP(transport http.RoundTripper, repo name.Repository, walkI
 	// TODO: This is really just an approximation to avoid exceeding typical socket limits
 	// See also quota limits:
 	// https://cloud.google.com/artifact-registry/quotas
-	g.SetLimit(1000)
+	g.SetLimit(10)
+	// copy only 2 first images
 	g.Go(func() error {
 		return google.Walk(repo, func(r name.Repository, tags *google.Tags, err error) error {
 			if err != nil {
 				return err
+			}
+			if !strings.Contains(r.Name(), "agent") {
+				klog.Infof("Skipping: %s", r.Name())
+				return nil
 			}
 			for digest, metadata := range tags.Manifests {
 				digest := digest

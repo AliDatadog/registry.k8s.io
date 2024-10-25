@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package main
+package cloudcidrs
 
 import (
 	"encoding/json"
@@ -25,7 +25,7 @@ import (
 
 // parseGCP parses raw GCP cloud.json data
 // and processes it to a regionsToPrefixes map
-func parseGCP(raw string) (regionsToPrefixes, error) {
+func parseGCP(raw string) (regionPrefixMapper, error) {
 	parsed, err := parseGCPCloudJSON([]byte(raw))
 	if err != nil {
 		return nil, err
@@ -55,9 +55,9 @@ func parseGCPCloudJSON(rawJSON []byte) (*GCPCloudJSON, error) {
 }
 
 // gcpRegionsToPrefixesFromData processes the raw unmarshalled JSON into regionsToPrefixes map
-func gcpRegionsToPrefixesFromData(data *GCPCloudJSON) (regionsToPrefixes, error) {
+func gcpRegionsToPrefixesFromData(data *GCPCloudJSON) (regionPrefixMapper, error) {
 	// convert from AWS published structure to a map by region, parse Prefixes
-	rtp := regionsToPrefixes{}
+	rtp := regionPrefixMapper{}
 	for _, prefix := range data.Prefixes {
 		region := prefix.Scope
 		if prefix.IPv4Prefix != "" {
