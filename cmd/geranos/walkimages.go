@@ -19,7 +19,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"strings"
 
 	"golang.org/x/sync/errgroup"
 
@@ -34,7 +33,7 @@ import (
 )
 
 // WalkImageLAyersFunc is used to visit an image
-type WalkImageLayersFunc func(ref name.Reference, layers []v1.Layer) error
+type WalkImageLayersFunc func(ref name.Reference, layers []v1.Layer, tags []string, manifestMediaType types.MediaType) error
 
 // Unfortunately this is only doable on GCP currently.
 //
@@ -46,38 +45,30 @@ type WalkImageLayersFunc func(ref name.Reference, layers []v1.Layer) error
 // It's also simpler and more efficient.
 //
 // See: https://github.com/opencontainers/distribution-spec/issues/222
-func WalkImageLayersGCP(transport http.RoundTripper, repo name.Repository, walkImageLayers WalkImageLayersFunc, skipImage func(string) bool) error {
+func WalkImageLayersGCP(transport http.RoundTripper, repo name.Repository, walkImageLayers WalkImageLayersFunc) error {
 	g := new(errgroup.Group)
 	// TODO: This is really just an approximation to avoid exceeding typical socket limits
 	// See also quota limits:
 	// https://cloud.google.com/artifact-registry/quotas
-	g.SetLimit(10)
-	// copy only 2 first images
+	g.SetLimit(1000)
 	g.Go(func() error {
 		return google.Walk(repo, func(r name.Repository, tags *google.Tags, err error) error {
 			if err != nil {
 				return err
 			}
-			if !strings.Contains(r.Name(), "agent") {
-				klog.Infof("Skipping: %s", r.Name())
-				return nil
-			}
+
 			for digest, metadata := range tags.Manifests {
-				digest := digest
-				// google.Walk already walks the child manifests
-				if metadata.MediaType == string(types.DockerManifestList) || metadata.MediaType == string(types.OCIImageIndex) {
-					continue
-				}
 				ref, err := name.ParseReference(fmt.Sprintf("%s@%s", r, digest))
 				if err != nil {
 					return err
 				}
 				g.Go(func() error {
-					if skipImage(digest) {
-						klog.V(4).Infof("Skipping already-uploaded: %s", ref)
-						return nil
+					err = walkManifestLayers(transport, ref, walkImageLayers, metadata.Tags)
+					if err != nil {
+						klog.Errorf("error walking manifest layers: %v", err)
+						return err
 					}
-					return walkManifestLayers(transport, ref, walkImageLayers)
+					return nil
 				})
 			}
 			return nil
@@ -86,26 +77,22 @@ func WalkImageLayersGCP(transport http.RoundTripper, repo name.Repository, walkI
 	return g.Wait()
 }
 
-func walkManifestLayers(transport http.RoundTripper, ref name.Reference, walkImageLayers WalkImageLayersFunc) error {
+func walkManifestLayers(transport http.RoundTripper, ref name.Reference, walkImageBlobs WalkImageLayersFunc, tags []string) error {
 	desc, err := remote.Get(ref, remote.WithTransport(transport))
 	if err != nil {
 		return err
 	}
 
+	// TODO handle manifest lists
 	// google.Walk already resolves these to individual manifests
 	if desc.MediaType.IsIndex() {
-		klog.Warningf("Skipping Index: %s", ref.String())
-		return nil
+		return walkImageBlobs(ref, nil, tags, desc.MediaType)
 	}
 
 	// Specially handle schema 1
 	// https://github.com/google/go-containerregistry/issues/377
-	if desc.MediaType == types.DockerManifestSchema1 || desc.MediaType == types.DockerManifestSchema1Signed {
-		layers, err := layersForV1(transport, ref, desc)
-		if err != nil {
-			return err
-		}
-		return walkImageLayers(ref, layers)
+	if desc.MediaType.IsSchema1() {
+		panic(fmt.Sprintf("schema 1 not supported: %s", ref.String()))
 	}
 
 	// we don't expect anything other than index, or image ...
@@ -119,14 +106,15 @@ func walkManifestLayers(transport http.RoundTripper, ref name.Reference, walkIma
 	if err != nil {
 		return err
 	}
-	layers, err := imageToLayers(image)
+	blobs, err := listBlobs(image)
 	if err != nil {
 		return err
 	}
-	return walkImageLayers(ref, layers)
+	return walkImageBlobs(ref, blobs, tags, desc.MediaType)
 }
 
-func imageToLayers(image v1.Image) ([]v1.Layer, error) {
+// listBlobs lists the blobs for an image (layers and config)
+func listBlobs(image v1.Image) ([]v1.Layer, error) {
 	layers, err := image.Layers()
 	if err != nil {
 		return nil, err

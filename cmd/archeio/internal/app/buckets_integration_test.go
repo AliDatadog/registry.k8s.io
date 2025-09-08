@@ -43,13 +43,13 @@ func TestIntegrationCachedBlobChecker(t *testing.T) {
 	}{
 		{
 			Name:         "known bucket entry",
-			BlobURL:      bucket + "/containers/images/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
+			BlobURL:      bucket + "/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
 			ExpectExists: true,
 		},
 		// to cover the case that we get a cache hit
 		{
 			Name:         "same-known bucket entry",
-			BlobURL:      bucket + "/containers/images/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
+			BlobURL:      bucket + "/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
 			ExpectExists: true,
 		},
 		{

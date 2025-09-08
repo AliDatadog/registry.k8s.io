@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/crane"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1/types"
 
 	"k8s.io/klog/v2"
 )
@@ -42,12 +43,11 @@ func Main() {
 
 // Run implements the actual application logic, accepting global inputs
 func Run(_ []string) error {
-	// one of the backing registries for registry.k8s.io
 	// TODO: make configurable later
 	const sourceRegistry = "eu.gcr.io/datadoghq"
 
 	// TODO: make configurable later
-	const s3Bucket = "aliregistry"
+	const s3Bucket = "adel.us-east-1"
 
 	// 80*60s = 4800 RPM, below our current 5000 RPM per-user limit on the registry
 	// Even with the host node making other registry API calls
@@ -68,13 +68,8 @@ func Run(_ []string) error {
 	// We will punt this temporarily, as we're about to refactor how this works anyhow
 	// to avoid fetching manifests for images we've already uploaded
 	err = WalkImageLayersGCP(registryRateLimit, repo,
-		func(ref name.Reference, layers []v1.Layer) error {
-			// klog.Infof("Processing image: %s", ref.String())
-			return s3Uploader.UploadImage(s3Bucket, ref, layers, crane.WithTransport(registryRateLimit))
-		},
-		func(imageHash string) bool {
-			s, _ := s3Uploader.ImageAlreadyUploaded(s3Bucket, imageHash)
-			return s
+		func(ref name.Reference, layers []v1.Layer, tags []string, manifestMediaType types.MediaType) error {
+			return s3Uploader.UploadImage(s3Bucket, ref, layers, tags, manifestMediaType, crane.WithTransport(registryRateLimit))
 		})
 	if err == nil {
 		klog.Info("Done!")

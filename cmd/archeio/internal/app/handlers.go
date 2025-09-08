@@ -17,24 +17,53 @@ limitations under the License.
 package app
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strings"
+	"time"
 
 	"k8s.io/klog/v2"
 
+	ddlambda "github.com/DataDog/datadog-lambda-go"
 	"k8s.io/registry.k8s.io/pkg/net/clientip"
 	"k8s.io/registry.k8s.io/pkg/net/cloudcidrs"
 )
 
+var regionMapper = cloudcidrs.NewIPMapper()
+
+// statusRecorder wraps http.ResponseWriter to capture the final status code.
+type statusRecorder struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *statusRecorder) WriteHeader(status int) {
+	w.statusCode = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *statusRecorder) Write(b []byte) (int, error) {
+	if w.statusCode == 0 {
+		w.statusCode = http.StatusOK
+	}
+	return w.ResponseWriter.Write(b)
+}
+
+type Registry struct {
+	Endpoint  string
+	Namespace string
+}
+
 type RegistryConfig struct {
-	UpstreamGCPEndpoint  string
-	UpstreamAZEndpoint   string
-	UpstreamRegistryPath string
-	InfoURL              string
-	PrivacyURL           string
-	DefaultAWSBaseURL    string
+	UpstreamUsGAR   Registry
+	UpstreamEuGAR   Registry
+	UpstreamAsiaGAR Registry
+	UpstreamACR     Registry
+	UpstreamCDN     Registry
+	InfoURL         string
+	PrivacyURL      string
 }
 
 // MakeHandler returns the root archeio HTTP handler
@@ -48,11 +77,44 @@ func MakeHandler(rc RegistryConfig) http.Handler {
 	doV2 := makeV2Handler(rc, blobs)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		klog.Infof("Handling request: %s %s", r.Method, r.URL.Path)
+
+		// Prepare metrics recording
+		recorder := &statusRecorder{ResponseWriter: w}
+		start := time.Now()
+		cloud := "unknown"
+		region := "unknown"
+		// Best-effort resolve client cloud/region for tagging
+		if ip, err := clientip.Get(r); err == nil {
+			if info, ok := regionMapper.GetIP(ip); ok {
+				if info.Cloud != "" {
+					cloud = info.Cloud
+				}
+				if info.Region != "" {
+					region = info.Region
+				}
+			}
+		}
+		defer func() {
+			status := recorder.statusCode
+			if status == 0 {
+				status = http.StatusOK
+			}
+			tags := []string{
+				fmt.Sprintf("method:%s", r.Method),
+				fmt.Sprintf("path:%s", r.URL.Path),
+				fmt.Sprintf("status_code:%d", status),
+				fmt.Sprintf("cloud:%s", cloud),
+				fmt.Sprintf("region:%s", region),
+			}
+			// Emit Lambda metrics via embedded logs for the Datadog Lambda extension
+			ddlambda.Metric("archeio.http.request", 1, tags...)
+			ddlambda.Distribution("archeio.http.latency_ms", float64(time.Since(start).Milliseconds()), tags...)
+		}()
 		// only allow GET, HEAD
 		// this is all a client needs to pull images
 		// we do *not* support mutation
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
-			http.Error(w, "Only GET and HEAD are allowed.", http.StatusMethodNotAllowed)
+			http.Error(recorder, "Only GET and HEAD are allowed.", http.StatusMethodNotAllowed)
 			return
 		}
 		// all valid registry requests should be at /v2/
@@ -60,28 +122,24 @@ func MakeHandler(rc RegistryConfig) http.Handler {
 		path := r.URL.Path
 		switch {
 		case strings.HasPrefix(path, "/v2"):
-			doV2(w, r)
+			doV2(recorder, r)
 		case path == "/":
-			http.Redirect(w, r, rc.InfoURL, http.StatusTemporaryRedirect)
+			http.Redirect(recorder, r, rc.InfoURL, http.StatusTemporaryRedirect)
 		case strings.HasPrefix(path, "/privacy"):
-			http.Redirect(w, r, rc.PrivacyURL, http.StatusTemporaryRedirect)
+			http.Redirect(recorder, r, rc.PrivacyURL, http.StatusTemporaryRedirect)
 		default:
 			klog.V(2).InfoS("unknown request", "path", path)
-			http.NotFound(w, r)
+			http.NotFound(recorder, r)
 		}
 	})
 }
 
 func makeV2Handler(rc RegistryConfig, blobs blobChecker) func(w http.ResponseWriter, r *http.Request) {
-	// matches blob requests, captures the requested blob hash
+	// matches blob and manifests requests, captures the requested blob hash and the manifest's reference
 	// https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pull
 	// Blobs are at `/v2/<name>/blobs/<digest>`
-	// Note that ':' cannot be contained in <name> but *must* be contained in <digest>
-	// <digest> also cannot contain `/` so we can use a relatively simple and cheap regex
-	// to match blob requests and capture the digest
-	reBlob := regexp.MustCompile("^/v2/.*/blobs/([^/]+:[a-zA-Z0-9=_-]+)$")
-	// initialize map of clientIP to AWS region
-	regionMapper := cloudcidrs.NewIPMapper()
+	// Manifests are at `/v2/<name>/manifests/<reference>`
+	reBlobOrManifest := regexp.MustCompile("^/v2/.*/(blobs|manifests)/.*$")
 	// capture these in a http handler lambda
 	return func(w http.ResponseWriter, r *http.Request) {
 		rPath := r.URL.Path
@@ -95,24 +153,15 @@ func makeV2Handler(rc RegistryConfig, blobs blobChecker) func(w http.ResponseWri
 			return
 		}
 		// Stay in the same cloud provider
-		ipInfo, ipIsKnown := regionMapper.GetIP(clientIP)
+		ipInfo, _ := regionMapper.GetIP(clientIP)
 
-		// we only care about publicly readable GCR as the backing registry
-		// or publicly readable blob storage
-		//
-		// when the client attempts to probe the API for auth, we always return
-		// 200 OK so it will not attempt to request an auth token
-		//
-		// this makes it easier to redirect to backends with different
-		// repo namespacing without worrying about incorrect token scope
-		//
-		// it turns out publicly readable GCR repos do not actually care about
-		// the presence of a token for any API calls, despite the /v2/ API call
-		// returning 401, prompting token auth
+		// when the client attempts to probe the API for auth
+		// For Azure, we redirect to the upstream registry to handle the auth token
+		// as ACR requires this token.
+		// For others, we serve 200 OK as we'll redirect to s3 or cloudfront
 		if rPath == "/v2/" || rPath == "/v2" {
 			if ipInfo.Cloud == cloudcidrs.AZ {
-				// Azure actually cares about auth tokens for the /v2/ API call
-				redirectURL := redirectUpstream(rc, rPath, ipInfo)
+				redirectURL := redirectUpstream(rc, rPath, ipInfo, rc.UpstreamACR)
 				klog.V(2).Infof("redirecting oauth request to %s", redirectURL)
 				http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 				return
@@ -131,33 +180,38 @@ func makeV2Handler(rc RegistryConfig, blobs blobChecker) func(w http.ResponseWri
 			return
 		}
 
-		// check if blob request
-		matches := reBlob.FindStringSubmatch(rPath)
-		if len(matches) != 2 {
-			// not a blob request so forward it to the main upstream registry
-			redirectURL := redirectUpstream(rc, rPath, ipInfo)
-			klog.V(2).Infof("redirecting manifest request to %s", redirectURL)
-			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
-			return
-		}
-		// it is a blob request, grab the hash for later
-		digest := matches[1]
-
-		if ipIsKnown && ipInfo.Cloud != cloudcidrs.AWS {
-			redirectURL := redirectUpstream(rc, rPath, ipInfo)
-			klog.V(2).Infof("redirecting blob request to %s", redirectURL)
+		// If the request is not a blob or manifest request, forward it to an upstream registry (not cdn)
+		matches := reBlobOrManifest.MatchString(rPath)
+		if !matches {
+			klog.Infof("not a blob or manifest request: %v", rPath)
+			redirectURL := redirectUpstream(rc, rPath, ipInfo, rc.UpstreamUsGAR)
+			klog.Infof("redirecting manifest request to %s", redirectURL)
 			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 			return
 		}
 
+		// If the request is a blob or manifest request, forward it to a matching registry OR CDN
+		if ipInfo.Cloud != cloudcidrs.AWS {
+			klog.Infof("cloud not aws: %v", ipInfo)
+			redirectURL := redirectUpstream(rc, rPath, ipInfo, rc.UpstreamCDN)
+			klog.Infof("redirecting blob or manifest request to %s", redirectURL)
+			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
+			return
+		}
+
+		// If the request is from AWS, check if the blob is available in our AWS layer storage for the region
 		// check if blob is available in our AWS layer storage for the region
-		region := ""
-		if ipIsKnown {
-			region = ipInfo.Region
-		}
-		bucketURL := awsRegionToHostURL(region, rc.DefaultAWSBaseURL)
+		region := ipInfo.Region
+		bucketURL := awsRegionToHostURL(region, rc.UpstreamCDN.Endpoint)
 		// this matches GCR's GCS layout, which we will use for other buckets
-		blobURL := bucketURL + "/containers/images/" + digest
+		blobURL, err := url.JoinPath(bucketURL, rPath)
+		if err != nil {
+			klog.ErrorS(err, "failed to join URL path", "path", rPath, "bucketURL", bucketURL)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		klog.Infof("Checking if blob exists: %s", blobURL)
 		if blobs.BlobExists(blobURL) {
 			// blob known to be available in AWS, redirect client there
 			klog.V(2).Infof("AWS: redirecting blob request to %s", blobURL)
@@ -165,48 +219,39 @@ func makeV2Handler(rc RegistryConfig, blobs blobChecker) func(w http.ResponseWri
 			return
 		}
 
-		// fall back to redirect to upstream
-		redirectURL := redirectUpstream(rc, rPath, ipInfo)
-		klog.V(2).InfoS("redirecting blob request to upstream registry", "path", rPath, "redirect", redirectURL)
+		// fall back to redirect to cdn
+		redirectURL := redirectUpstream(rc, rPath, ipInfo, rc.UpstreamCDN)
+		klog.InfoS("redirecting blob request to upstream registry", "path", rPath, "redirect", redirectURL)
 		http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 	}
 }
 
-func redirectUpstream(rc RegistryConfig, originalPath string, ipInfo cloudcidrs.IPInfo) string {
-	endpoint := rc.UpstreamGCPEndpoint
+func redirectUpstream(rc RegistryConfig, originalPath string, ipInfo cloudcidrs.IPInfo, defaultRegistry Registry) string {
+	reg := defaultRegistry
 
 	// Determine endpoint based on provider and region
 	switch ipInfo.Cloud {
 	case cloudcidrs.AZ:
 		klog.Infof("Redirecting to Azure endpoint")
-		endpoint = rc.UpstreamAZEndpoint
+		reg = rc.UpstreamACR
 	case cloudcidrs.GCP:
 		if strings.HasPrefix(ipInfo.Region, "europe") ||
 			strings.HasPrefix(ipInfo.Region, "me-") ||
 			strings.HasPrefix(ipInfo.Region, "africa") {
 			klog.Infof("Redirecting to GCP EU endpoint")
-			endpoint = "https://eu.gcr.io"
-		}
-		if strings.Contains(ipInfo.Region, "america") ||
-			strings.HasPrefix(ipInfo.Region, "us-") {
-			klog.Infof("Redirecting to GCP US endpoint")
-			endpoint = "https://gcr.io"
+			reg = rc.UpstreamEuGAR
 		}
 		if strings.HasPrefix(ipInfo.Region, "asia-") ||
 			strings.HasPrefix(ipInfo.Region, "australia-") {
 			klog.Infof("Redirecting to GCP Asia endpoint")
-			endpoint = "https://asia.gcr.io"
+			reg = rc.UpstreamAsiaGAR
 		}
 	default:
-		klog.Infof("Redirecting to default endpoint")
+		klog.Infof("Redirecting to default endpoint %v", reg)
 	}
 
-	registryPath := rc.UpstreamRegistryPath
-	if ipInfo.Cloud == cloudcidrs.AZ {
-		registryPath = ""
-	}
 	// Build the redirect URL
-	redirectUrl, err := url.JoinPath(endpoint, "/v2/", registryPath, strings.TrimPrefix(originalPath, "/v2"))
+	redirectUrl, err := url.JoinPath(reg.Endpoint, "/v2/", reg.Namespace, strings.TrimPrefix(originalPath, "/v2"))
 	if err != nil {
 		panic("failed to join URL path: " + err.Error())
 	}

@@ -84,9 +84,9 @@ You may use commands such as `crane`, `oras`, `crictl` or `docker` to verify the
 2023/03/17 04:45:48 --> GET https://registry.k8s.io/v2/pause/manifests/sha256:8d4106c88ec0bd28001e34c975d65175d994072d65341f62a8ab0754b0fafe10
 2023/03/17 04:45:48 --> GET https://us-west1-docker.pkg.dev/v2/k8s-artifacts-prod/images/pause/manifests/sha256:8d4106c88ec0bd28001e34c975d65175d994072d65341f62a8ab0754b0fafe10
 2023/03/17 04:45:49 --> GET https://registry.k8s.io/v2/pause/blobs/sha256:e6f1816883972d4be47bd48879a08919b96afcd344132622e4d444987919323c
-2023/03/17 04:45:49 --> GET https://prod-registry-k8s-io-us-west-2.s3.dualstack.us-west-2.amazonaws.com/containers/images/sha256%3Ae6f1816883972d4be47bd48879a08919b96afcd344132622e4d444987919323c
+2023/03/17 04:45:49 --> GET https://prod-registry-k8s-io-us-west-2.s3.dualstack.us-west-2.amazonaws.com/sha256%3Ae6f1816883972d4be47bd48879a08919b96afcd344132622e4d444987919323c
 2023/03/17 04:45:49 --> GET https://registry.k8s.io/v2/pause/blobs/sha256:61fec91190a0bab34406027bbec43d562218df6e80d22d4735029756f23c7007 [body redacted: omitting binary blobs from logs]
-2023/03/17 04:45:49 --> GET https://prod-registry-k8s-io-us-west-2.s3.dualstack.us-west-2.amazonaws.com/containers/images/sha256%3A61fec91190a0bab34406027bbec43d562218df6e80d22d4735029756f23c7007 [body redacted: omitting binary blobs from logs]
+2023/03/17 04:45:49 --> GET https://prod-registry-k8s-io-us-west-2.s3.dualstack.us-west-2.amazonaws.com/sha256%3A61fec91190a0bab34406027bbec43d562218df6e80d22d4735029756f23c7007 [body redacted: omitting binary blobs from logs]
 ```
 
 From my location, the pull command accesses registry.k8s.io, us-west1-docker.pkg.dev and prod-registry-k8s-io-us-west-2.s3.dualstack.us-west-2.amazonaws.com. You will need to have DNS and HTTP access to these domains on your node to pull images.
