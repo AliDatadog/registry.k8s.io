@@ -24,24 +24,21 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// TODO: replace with a more dynamic way to get the bucket URL
+var knownS3Buckets = map[string]string{
+	"us-east-1":      "https://adel.us-east-1.s3.dualstack.us-east-1.amazonaws.com",
+	"ap-southeast-1": "https://adel-reg.ap-southeast-1.s3.dualstack.ap-southeast-1.amazonaws.com",
+	"eu-central-1":   "https://adel-reg.eu-central-1.s3.dualstack.eu-central-1.amazonaws.com",
+}
+
 // awsRegionToHostURL returns the base S3 bucket URL for an OCI layer blob given the AWS region
 //
 // blobs in the buckets should be stored at /containers/images/sha256:$hash
 func awsRegionToHostURL(region, defaultURL string) string {
-	switch region {
-	// each of these has the region in which we have a bucket listed first
-	// and then additional regions we're mapping to that bucket
-	// based roughly on physical adjacency (and therefore _presumed_ latency)
-	//
-	// if you add a bucket, add a case for the region it is in, and consider
-	// shifting other regions that do not have their own bucket
-
-	//// US East (N. Virginia)
-	case "us-east-1", "us-east-2", "us-west-1", "us-west-2":
-		return "https://containerimageregistry.s3.us-east-1.amazonaws.com"
-	default:
-		return defaultURL
+	if url, ok := knownS3Buckets[region]; ok {
+		return url
 	}
+	return defaultURL
 }
 
 // blobChecker are used to check if a blob exists, possibly with caching

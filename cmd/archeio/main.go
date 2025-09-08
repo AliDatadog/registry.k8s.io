@@ -27,6 +27,9 @@ import (
 
 	"k8s.io/klog/v2"
 
+	ddlambda "github.com/DataDog/datadog-lambda-go"
+	"github.com/aws/aws-lambda-go/lambda"
+	httpadapter "github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 	"k8s.io/registry.k8s.io/cmd/archeio/internal/app"
 )
 
@@ -42,19 +45,45 @@ func main() {
 
 	// make it possible to override k8s.gcr.io without rebuilding in the future
 	registryConfig := app.RegistryConfig{
-		UpstreamGCPEndpoint:  getEnv("UPSTREAM_REGISTRY_ENDPOINT", "https://gcr.io"),
-		UpstreamAZEndpoint:   getEnv("UPSTREAM_AZ_ENDPOINT", "https://datadoghq.azurecr.io"),
-		UpstreamRegistryPath: getEnv("UPSTREAM_REGISTRY_PATH", "datadoghq"),
-		InfoURL:              "https://docs.datadoghq.com/",
-		PrivacyURL:           "https://www.datadoghq.com/legal/privacy/",
-		DefaultAWSBaseURL:    getEnv("DEFAULT_AWS_BASE_URL", "https://aliregistry.s3.eu-west-3.amazonaws.com"),
+		UpstreamUsGAR: app.Registry{
+			Endpoint:  getEnv("UPSTREAM_US_GCP_ENDPOINT", "https://gcr.io"),
+			Namespace: getEnv("UPSTREAM_US_GCP_NAMESPACE", "datadoghq"),
+		},
+		UpstreamEuGAR: app.Registry{
+			Endpoint:  getEnv("UPSTREAM_EU_GCP_ENDPOINT", "https://eu.gcr.io"),
+			Namespace: getEnv("UPSTREAM_EU_GCP_NAMESPACE", "datadoghq"),
+		},
+		UpstreamAsiaGAR: app.Registry{
+			Endpoint:  getEnv("UPSTREAM_AP_GCP_GCR_ENDPOINT", "https://asia.gcr.io"),
+			Namespace: getEnv("UPSTREAM_AP_GCP_GCR_NAMESPACE", "datadoghq"),
+		},
+		UpstreamACR: app.Registry{
+			// Azure does not use a registry path, the endpoint is already datadoghq.azurecr.io
+			Endpoint: getEnv("UPSTREAM_AZ_ENDPOINT", "https://datadoghq.azurecr.io"),
+		},
+		UpstreamCDN: app.Registry{
+			// CloudFront does not use a registry path, the endpoint is already d1u5qnb27isorz.cloudfront.net
+			Endpoint: getEnv("UPSTREAM_CDN_ENDPOINT", "https://d1u5qnb27isorz.cloudfront.net"),
+		},
+		InfoURL:    "https://docs.datadoghq.com/",
+		PrivacyURL: "https://www.datadoghq.com/legal/privacy/",
+	}
+
+	handler := app.MakeHandler(registryConfig)
+
+	// If running inside AWS Lambda, start the Lambda event loop using the API Gateway proxy adapter
+	if isRunningInLambda() {
+		klog.InfoS("detected AWS Lambda environment; starting Lambda adapter (APIGWv2/Function URL)")
+		adapter := httpadapter.New(handler)
+		lambda.Start(ddlambda.WrapHandler(adapter.ProxyWithContext, nil))
+		return
 	}
 
 	// configure server with reasonable timeout
 	// we only serve redirects, 10s should be sufficient
 	server := &http.Server{
 		Addr:              ":" + port,
-		Handler:           app.MakeHandler(registryConfig),
+		Handler:           handler,
 		ReadTimeout:       10 * time.Second,
 		ReadHeaderTimeout: 2 * time.Second,
 	}
@@ -87,4 +116,15 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// isRunningInLambda returns true if the current process appears to be running in AWS Lambda
+func isRunningInLambda() bool {
+	if v := os.Getenv("AWS_LAMBDA_FUNCTION_NAME"); v != "" {
+		return true
+	}
+	if v := os.Getenv("LAMBDA_RUNTIME_DIR"); v != "" {
+		return true
+	}
+	return false
 }
