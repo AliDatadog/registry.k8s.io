@@ -56,7 +56,7 @@ func WalkImageLayersGCP(transport http.RoundTripper, repo name.Repository, walkI
 	// TODO: This is really just an approximation to avoid exceeding typical socket limits
 	// See also quota limits:
 	// https://cloud.google.com/artifact-registry/quotas
-	g.SetLimit(1000)
+	g.SetLimit(30)
 	g.Go(func() error {
 		return google.Walk(repo, func(r name.Repository, tags *google.Tags, err error) error {
 			if err != nil {
