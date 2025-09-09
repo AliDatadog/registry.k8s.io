@@ -18,7 +18,13 @@ package main
 
 import (
 	"fmt"
+	"hash/fnv"
+	"math/rand"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -57,11 +63,45 @@ func WalkImageLayersGCP(transport http.RoundTripper, repo name.Repository, walkI
 				return err
 			}
 
-			for digest, metadata := range tags.Manifests {
-				ref, err := name.ParseReference(fmt.Sprintf("%s@%s", r, digest))
+			// Build a slice of manifest digests to allow optional shuffling and sharding
+			type manifestEntry struct {
+				digest   string
+				metadata google.ManifestInfo
+			}
+			entries := make([]manifestEntry, 0, len(tags.Manifests))
+			for d, m := range tags.Manifests {
+				entries = append(entries, manifestEntry{digest: d, metadata: m})
+			}
+
+			// Optional shuffle controlled by env GERANOS_SHUFFLE and GERANOS_RANDOM_SEED
+			if envBool("GERANOS_SHUFFLE") {
+				seed := time.Now().UnixNano()
+				if s := os.Getenv("GERANOS_RANDOM_SEED"); s != "" {
+					if v, perr := strconv.ParseInt(s, 10, 64); perr == nil {
+						seed = v
+					}
+				}
+				rng := rand.New(rand.NewSource(seed))
+				for i := len(entries) - 1; i > 0; i-- {
+					j := rng.Intn(i + 1)
+					entries[i], entries[j] = entries[j], entries[i]
+				}
+			}
+
+			// Optional sharding via GERANOS_SHARD_TOTAL and GERANOS_SHARD_INDEX
+			shardTotal, shardIndex := parseShardEnv()
+
+			for _, e := range entries {
+				if shardTotal > 1 {
+					if shardIndexForDigest(e.digest, shardTotal) != shardIndex {
+						continue
+					}
+				}
+				ref, err := name.ParseReference(fmt.Sprintf("%s@%s", r, e.digest))
 				if err != nil {
 					return err
 				}
+				metadata := e.metadata
 				g.Go(func() error {
 					err = walkManifestLayers(transport, ref, walkImageLayers, metadata.Tags)
 					if err != nil {
@@ -124,4 +164,41 @@ func listBlobs(image v1.Image) ([]v1.Layer, error) {
 		return nil, err
 	}
 	return append(layers, configLayer), nil
+}
+
+// envBool returns true if the environment variable is a truthy string.
+func envBool(name string) bool {
+	v := strings.ToLower(os.Getenv(name))
+	return v == "1" || v == "true" || v == "t" || v == "yes" || v == "y"
+}
+
+// parseShardEnv reads sharding settings from env and returns (total, index).
+// Defaults to (1,0) meaning no sharding.
+func parseShardEnv() (int, int) {
+	total := 1
+	index := 0
+	if ts := os.Getenv("GERANOS_SHARD_TOTAL"); ts != "" {
+		if v, err := strconv.Atoi(ts); err == nil && v > 0 {
+			total = v
+		} else if err != nil {
+			klog.Warningf("invalid GERANOS_SHARD_TOTAL=%q: %v; defaulting to 1", ts, err)
+		}
+	}
+	if is := os.Getenv("GERANOS_SHARD_INDEX"); is != "" {
+		if v, err := strconv.Atoi(is); err == nil && v >= 0 && v < total {
+			index = v
+		} else if err != nil {
+			klog.Warningf("invalid GERANOS_SHARD_INDEX=%q: %v; defaulting to 0", is, err)
+		} else {
+			klog.Warningf("GERANOS_SHARD_INDEX=%d out of range for total=%d; defaulting to 0", v, total)
+		}
+	}
+	return total, index
+}
+
+// shardIndexForDigest computes a stable shard index for a given manifest digest.
+func shardIndexForDigest(digest string, shardTotal int) int {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(digest))
+	return int(h.Sum32() % uint32(shardTotal))
 }
