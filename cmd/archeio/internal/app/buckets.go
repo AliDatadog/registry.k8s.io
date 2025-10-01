@@ -27,6 +27,8 @@ import (
 // TODO: replace with a more dynamic way to get the bucket URL
 var knownS3Buckets = map[string]string{
 	"us-east-1":      "https://adel-us-east-1.s3.dualstack.us-east-1.amazonaws.com",
+	"us-east-2":      "https://adel-us-east-2.s3.dualstack.us-east-2.amazonaws.com",
+	"us-west-1":      "https://adel-us-west-1.s3.dualstack.us-west-1.amazonaws.com",
 	"ap-southeast-1": "https://adel-ap-southeast-1.s3.dualstack.ap-southeast-1.amazonaws.com",
 	"eu-central-1":   "https://adel-eu-central-1.s3.dualstack.eu-central-1.amazonaws.com",
 }

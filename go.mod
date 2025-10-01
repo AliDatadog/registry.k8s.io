@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.5
 
 require (
+	github.com/DataDog/datadog-lambda-go v1.25.1
 	github.com/aws/aws-lambda-go v1.48.0
 	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/config v1.29.17
@@ -12,7 +13,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.83.0
 	github.com/aws/smithy-go v1.22.4
 	github.com/awslabs/aws-lambda-go-api-proxy v0.16.1
-	github.com/DataDog/datadog-lambda-go v1.25.1
 	github.com/google/go-containerregistry v0.20.6
 	golang.org/x/sync v0.16.0
 	golang.org/x/time v0.12.0
@@ -39,6 +39,7 @@ require (
 	github.com/DataDog/sketches-go v1.4.7 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
+	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.11 // indirect
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.70 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.32 // indirect
