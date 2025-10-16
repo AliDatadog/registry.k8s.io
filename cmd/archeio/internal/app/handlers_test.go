@@ -32,7 +32,7 @@ func TestMakeHandler(t *testing.T) {
 		UpstreamEuGAR:   Registry{Endpoint: "https://eu.gcr.io", Namespace: "datadoghq"},
 		UpstreamAsiaGAR: Registry{Endpoint: "https://asia.gcr.io", Namespace: "datadoghq"},
 		UpstreamACR:     Registry{Endpoint: "https://datadoghq.azurecr.io"},
-		UpstreamCDN:     Registry{Endpoint: "https://d1u5qnb27isorz.cloudfront.net"},
+		UpstreamCDN:     Registry{Endpoint: "https://d3o2h7i3xf2t1t.cloudfront.net"},
 		InfoURL:         "https://docs.datadoghq.com/",
 		PrivacyURL:      "https://www.datadoghq.com/legal/privacy/",
 	}
@@ -85,13 +85,13 @@ func TestMakeHandler(t *testing.T) {
 			Name:           "/v2/pause/manifests/latest",
 			Request:        httptest.NewRequest("GET", "http://localhost:8080/v2/pause/manifests/latest", nil),
 			ExpectedStatus: http.StatusTemporaryRedirect,
-			ExpectedURL:    "https://d1u5qnb27isorz.cloudfront.net/v2/pause/manifests/latest",
+			ExpectedURL:    "https://d3o2h7i3xf2t1t.cloudfront.net/v2/pause/manifests/latest",
 		},
 		{
 			Name:           "/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
 			Request:        httptest.NewRequest("GET", "http://localhost:8080/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e", nil),
 			ExpectedStatus: http.StatusTemporaryRedirect,
-			ExpectedURL:    "https://d1u5qnb27isorz.cloudfront.net/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
+			ExpectedURL:    "https://d3o2h7i3xf2t1t.cloudfront.net/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
 		},
 	}
 	for i := range testCases {
@@ -144,7 +144,7 @@ func TestMakeV2Handler(t *testing.T) {
 		UpstreamEuGAR:   Registry{Endpoint: "https://eu.gcr.io", Namespace: "datadoghq"},
 		UpstreamAsiaGAR: Registry{Endpoint: "https://asia.gcr.io", Namespace: "datadoghq"},
 		UpstreamACR:     Registry{Endpoint: "https://datadoghq.azurecr.io"},
-		UpstreamCDN:     Registry{Endpoint: "https://d1u5qnb27isorz.cloudfront.net"},
+		UpstreamCDN:     Registry{Endpoint: "https://d3o2h7i3xf2t1t.cloudfront.net"},
 		InfoURL:         "https://docs.datadoghq.com/",
 		PrivacyURL:      "https://www.datadoghq.com/legal/privacy/",
 	}
@@ -156,7 +156,7 @@ func TestMakeV2Handler(t *testing.T) {
 			"https://adel.us-east-1.s3.dualstack.us-east-1.amazonaws.com/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e":               true,
 			"https://adel-reg.ap-southeast-1.s3.dualstack.ap-southeast-1.amazonaws.com/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e": true,
 			"https://adel-reg.eu-central-1.s3.dualstack.eu-central-1.amazonaws.com/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e":     true,
-			"https://d1u5qnb27isorz.cloudfront.net/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e":                                     true,
+			"https://d3o2h7i3xf2t1t.cloudfront.net/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e":                                     true,
 		},
 	}
 
@@ -220,7 +220,7 @@ func TestMakeV2Handler(t *testing.T) {
 				return r
 			}(),
 			ExpectedStatus: http.StatusTemporaryRedirect,
-			ExpectedURL:    "https://d1u5qnb27isorz.cloudfront.net/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
+			ExpectedURL:    "https://d3o2h7i3xf2t1t.cloudfront.net/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
 		},
 		{
 			Name: "Bogus remote addr -> 400",
@@ -258,7 +258,7 @@ func TestMakeV2Handler(t *testing.T) {
 				return r
 			}(),
 			ExpectedStatus: http.StatusTemporaryRedirect,
-			ExpectedURL:    "https://d1u5qnb27isorz.cloudfront.net/v2/pause/manifests/latest",
+			ExpectedURL:    "https://d3o2h7i3xf2t1t.cloudfront.net/v2/pause/manifests/latest",
 		},
 		{
 			Name: "Blob not present in S3 -> fallback to CDN",
@@ -268,7 +268,7 @@ func TestMakeV2Handler(t *testing.T) {
 				return r
 			}(),
 			ExpectedStatus: http.StatusTemporaryRedirect,
-			ExpectedURL:    "https://d1u5qnb27isorz.cloudfront.net/v2/pause/blobs/sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1234567",
+			ExpectedURL:    "https://d3o2h7i3xf2t1t.cloudfront.net/v2/pause/blobs/sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1234567",
 		},
 		{
 			Name: "Manifest not present in S3 -> fallback to CDN",
@@ -278,7 +278,7 @@ func TestMakeV2Handler(t *testing.T) {
 				return r
 			}(),
 			ExpectedStatus: http.StatusTemporaryRedirect,
-			ExpectedURL:    "https://d1u5qnb27isorz.cloudfront.net/v2/pause/manifests/aaaaa",
+			ExpectedURL:    "https://d3o2h7i3xf2t1t.cloudfront.net/v2/pause/manifests/aaaaa",
 		},
 		{
 			Name: "GCP EU -> EU GCR",
@@ -328,7 +328,7 @@ func TestMakeV2Handler(t *testing.T) {
 				return r
 			}(),
 			ExpectedStatus: http.StatusTemporaryRedirect,
-			ExpectedURL:    "https://d1u5qnb27isorz.cloudfront.net/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
+			ExpectedURL:    "https://d3o2h7i3xf2t1t.cloudfront.net/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
 		},
 	}
 

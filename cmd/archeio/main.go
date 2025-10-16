@@ -62,8 +62,8 @@ func main() {
 			Endpoint: getEnv("UPSTREAM_AZ_ENDPOINT", "https://datadoghq.azurecr.io"),
 		},
 		UpstreamCDN: app.Registry{
-			// CloudFront does not use a registry path, the endpoint is already d1u5qnb27isorz.cloudfront.net
-			Endpoint: getEnv("UPSTREAM_CDN_ENDPOINT", "https://d1u5qnb27isorz.cloudfront.net"),
+			// CloudFront does not use a registry path, the endpoint is already d3o2h7i3xf2t1t.cloudfront.net
+			Endpoint: getEnv("UPSTREAM_CDN_ENDPOINT", "https://d3o2h7i3xf2t1t.cloudfront.net"),
 		},
 		InfoURL:    "https://docs.datadoghq.com/",
 		PrivacyURL: "https://www.datadoghq.com/legal/privacy/",
