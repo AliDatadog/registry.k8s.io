@@ -148,8 +148,8 @@ func MakeHandler(rc RegistryConfig) http.Handler {
 				fmt.Sprintf("method:%s", r.Method),
 				fmt.Sprintf("path:%s", r.URL.Path),
 				fmt.Sprintf("status_code:%d", status),
-				fmt.Sprintf("cloud:%s", cloud),
-				fmt.Sprintf("region:%s", region),
+				fmt.Sprintf("client_cloud:%s", cloud),
+				fmt.Sprintf("client_region:%s", region),
 			}
 			// Emit Lambda metrics via embedded logs for the Datadog Lambda extension
 			ddlambda.Metric("archeio.http.request", 1, tags...)
