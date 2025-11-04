@@ -112,7 +112,12 @@ func makeV2Handler(rc RegistryConfig, blobs blobChecker) func(w http.ResponseWri
 		if rPath == "/v2/" || rPath == "/v2" {
 			if ipInfo.Cloud == cloudcidrs.AZ {
 				// Azure actually cares about auth tokens for the /v2/ API call
-				redirectURL := redirectUpstream(rc, rPath, ipInfo)
+				redirectURL, err := redirectUpstream(rc, rPath, ipInfo)
+				if err != nil {
+					klog.ErrorS(err, "failed to build redirect URL")
+					http.Error(w, "Internal server error", http.StatusInternalServerError)
+					return
+				}
 				klog.V(2).Infof("redirecting oauth request to %s", redirectURL)
 				http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 				return
@@ -135,7 +140,12 @@ func makeV2Handler(rc RegistryConfig, blobs blobChecker) func(w http.ResponseWri
 		matches := reBlob.FindStringSubmatch(rPath)
 		if len(matches) != 2 {
 			// not a blob request so forward it to the main upstream registry
-			redirectURL := redirectUpstream(rc, rPath, ipInfo)
+			redirectURL, err := redirectUpstream(rc, rPath, ipInfo)
+			if err != nil {
+				klog.ErrorS(err, "failed to build redirect URL")
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
 			klog.V(2).Infof("redirecting manifest request to %s", redirectURL)
 			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 			return
@@ -144,7 +154,12 @@ func makeV2Handler(rc RegistryConfig, blobs blobChecker) func(w http.ResponseWri
 		digest := matches[1]
 
 		if ipIsKnown && ipInfo.Cloud != cloudcidrs.AWS {
-			redirectURL := redirectUpstream(rc, rPath, ipInfo)
+			redirectURL, err := redirectUpstream(rc, rPath, ipInfo)
+			if err != nil {
+				klog.ErrorS(err, "failed to build redirect URL")
+				http.Error(w, "Internal server error", http.StatusInternalServerError)
+				return
+			}
 			klog.V(2).Infof("redirecting blob request to %s", redirectURL)
 			http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 			return
@@ -166,13 +181,18 @@ func makeV2Handler(rc RegistryConfig, blobs blobChecker) func(w http.ResponseWri
 		}
 
 		// fall back to redirect to upstream
-		redirectURL := redirectUpstream(rc, rPath, ipInfo)
+		redirectURL, err := redirectUpstream(rc, rPath, ipInfo)
+		if err != nil {
+			klog.ErrorS(err, "failed to build redirect URL")
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
 		klog.V(2).InfoS("redirecting blob request to upstream registry", "path", rPath, "redirect", redirectURL)
 		http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 	}
 }
 
-func redirectUpstream(rc RegistryConfig, originalPath string, ipInfo cloudcidrs.IPInfo) string {
+func redirectUpstream(rc RegistryConfig, originalPath string, ipInfo cloudcidrs.IPInfo) (string, error) {
 	endpoint := rc.UpstreamGCPEndpoint
 
 	// Determine endpoint based on provider and region
@@ -208,7 +228,7 @@ func redirectUpstream(rc RegistryConfig, originalPath string, ipInfo cloudcidrs.
 	// Build the redirect URL
 	redirectUrl, err := url.JoinPath(endpoint, "/v2/", registryPath, strings.TrimPrefix(originalPath, "/v2"))
 	if err != nil {
-		panic("failed to join URL path: " + err.Error())
+		return "", err
 	}
-	return redirectUrl
+	return redirectUrl, nil
 }
