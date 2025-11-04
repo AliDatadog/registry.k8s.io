@@ -270,14 +270,14 @@ func TestMakeV2Handler(t *testing.T) {
 			ExpectedURL:    "https://eu.gcr.io/v2/datadoghq/pause/manifests/latest",
 		},
 		{
-			Name: "GCP US blob -> CDN",
+			Name: "GCP US blob -> US GCR",
 			Request: func() *http.Request {
 				r := httptest.NewRequest("GET", "http://localhost:8080/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e", nil)
 				r.RemoteAddr = "10.0.0.2:1234"
 				return r
 			}(),
 			ExpectedStatus: http.StatusTemporaryRedirect,
-			ExpectedURL:    "https://d3o2h7i3xf2t1t.cloudfront.net/v2/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
+			ExpectedURL:    "https://gcr.io/v2/datadoghq/pause/blobs/sha256:da86e6ba6ca197bf6bc5e9d900febd906b133eaa4750e6bed647b0fbe50ed43e",
 		},
 	}
 
