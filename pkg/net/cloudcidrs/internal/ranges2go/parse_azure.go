@@ -45,8 +45,8 @@ type AZPrefix struct {
 	Region     string   `json:"region"`
 }
 
-// parseIPRangesJSON parse AZ IP ranges JSON data
-// https://docs.AZ.amazon.com/general/latest/gr/AZ-ip-ranges.html
+// parseAZIPRangesJSON parses Azure Service Tags IP ranges JSON data
+// https://learn.microsoft.com/en-us/azure/virtual-network/service-tags-overview
 func parseAZIPRangesJSON(rawJSON []byte) (*AZIPRangesJSON, error) {
 	r := &AZIPRangesJSON{}
 	if err := json.Unmarshal(rawJSON, r); err != nil {
@@ -57,7 +57,7 @@ func parseAZIPRangesJSON(rawJSON []byte) (*AZIPRangesJSON, error) {
 
 // AZRegionsToPrefixesFromData processes the raw unmarshalled JSON into regionsToPrefixes map
 func AZRegionsToPrefixesFromData(data *AZIPRangesJSON) (regionsToPrefixes, error) {
-	// convert from AZ published structure to a map by region, parse Prefixes
+	// convert from Azure published structure to a map by region, parse Prefixes
 	rtp := regionsToPrefixes{}
 	for _, value := range data.Values {
 		region := value.Prefixes.Region
