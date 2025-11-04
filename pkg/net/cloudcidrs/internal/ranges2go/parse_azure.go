@@ -24,7 +24,7 @@ import (
 
 // parseAZ parses raw AZ IP ranges JSON data
 // and processes it to a regionsToPrefixes map
-func parseAZ(raw string) (regionPrefixMapper, error) {
+func parseAZ(raw string) (regionsToPrefixes, error) {
 	parsed, err := parseAZIPRangesJSON([]byte(raw))
 	if err != nil {
 		return nil, err
@@ -56,9 +56,9 @@ func parseAZIPRangesJSON(rawJSON []byte) (*AZIPRangesJSON, error) {
 }
 
 // AZRegionsToPrefixesFromData processes the raw unmarshalled JSON into regionsToPrefixes map
-func AZRegionsToPrefixesFromData(data *AZIPRangesJSON) (regionPrefixMapper, error) {
+func AZRegionsToPrefixesFromData(data *AZIPRangesJSON) (regionsToPrefixes, error) {
 	// convert from AZ published structure to a map by region, parse Prefixes
-	rtp := regionPrefixMapper{}
+	rtp := regionsToPrefixes{}
 	for _, value := range data.Values {
 		region := value.Prefixes.Region
 		for _, prefix := range value.Prefixes.IPPrefixes {
