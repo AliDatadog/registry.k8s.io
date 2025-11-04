@@ -22,3 +22,4 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 # fetch data for each supported cloud
 curl -Lo 'data/aws-ip-ranges.json' 'https://ip-ranges.amazonaws.com/ip-ranges.json'
 curl -Lo 'data/gcp-cloud.json' 'https://www.gstatic.com/ipranges/cloud.json'
+curl -Lo 'data/azure-cloud.json' 'https://download.microsoft.com/download/7/1/d/71d86715-5596-4529-9b13-da13a5de5b63/ServiceTags_Public_20250908.json'
