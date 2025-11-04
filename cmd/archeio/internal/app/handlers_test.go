@@ -239,7 +239,8 @@ func TestMakeV2Handler(t *testing.T) {
 			Name: "GCP EU -> EU GCR",
 			Request: func() *http.Request {
 				r := httptest.NewRequest("GET", "http://localhost:8080/v2/pause/manifests/latest", nil)
-				r.RemoteAddr = "10.0.0.4:1234"
+				// Use a real GCP europe-west1 IP
+				r.RemoteAddr = "34.76.0.1:1234"
 				return r
 			}(),
 			ExpectedStatus: http.StatusTemporaryRedirect,
