@@ -42,11 +42,12 @@ func main() {
 
 	// make it possible to override k8s.gcr.io without rebuilding in the future
 	registryConfig := app.RegistryConfig{
-		UpstreamRegistryEndpoint: getEnv("UPSTREAM_REGISTRY_ENDPOINT", "https://us-central1-docker.pkg.dev"),
-		UpstreamRegistryPath:     getEnv("UPSTREAM_REGISTRY_PATH", "k8s-artifacts-prod/images"),
-		InfoURL:                  "https://github.com/kubernetes/registry.k8s.io",
-		PrivacyURL:               "https://www.linuxfoundation.org/privacy-policy/",
-		DefaultAWSBaseURL:        getEnv("DEFAULT_AWS_BASE_URL", "https://prod-registry-k8s-io-us-east-1.s3.dualstack.us-east-1.amazonaws.com"),
+		UpstreamGCPEndpoint:  getEnv("UPSTREAM_REGISTRY_ENDPOINT", "https://gcr.io"),
+		UpstreamAZEndpoint:   getEnv("UPSTREAM_AZ_ENDPOINT", "https://datadoghq.azurecr.io"),
+		UpstreamRegistryPath: getEnv("UPSTREAM_REGISTRY_PATH", "datadoghq"),
+		InfoURL:              "https://docs.datadoghq.com/",
+		PrivacyURL:           "https://www.datadoghq.com/legal/privacy/",
+		DefaultAWSBaseURL:    getEnv("DEFAULT_AWS_BASE_URL", "https://aliregistry.s3.eu-west-3.amazonaws.com"),
 	}
 
 	// configure server with reasonable timeout
