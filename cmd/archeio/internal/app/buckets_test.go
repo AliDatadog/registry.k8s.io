@@ -47,11 +47,13 @@ func TestRegionToAWSRegionToHostURL(t *testing.T) {
 
 func TestBlobCache(t *testing.T) {
 	bc := &blobCache{}
-	bc.Put("foo")
-	if !bc.Get("foo") {
+	bc.Put("foo", true)
+	exists, found := bc.Get("foo")
+	if !found || !exists {
 		t.Fatal("Cache did not contain key we just put")
 	}
-	if bc.Get("bar") {
+	_, found = bc.Get("bar")
+	if found {
 		t.Fatal("Cache contained key we did not put")
 	}
 }
