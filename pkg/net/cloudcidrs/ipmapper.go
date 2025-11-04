@@ -16,26 +16,29 @@ limitations under the License.
 
 package cloudcidrs
 
-import "k8s.io/registry.k8s.io/pkg/net/cidrs"
+import (
+	"k8s.io/registry.k8s.io/pkg/net/cidrs"
+)
 
 // NewIPMapper returns cidrs.IPMapper populated with cloud region info
 // for the clouds we have resources for, currently GCP and AWS
 func NewIPMapper() cidrs.IPMapper[IPInfo] {
 	t := cidrs.NewTrieMap[IPInfo]()
-	for info, cidrs := range regionToRanges {
-		for _, cidr := range cidrs {
-			t.Insert(cidr, info)
+	// Use pre-generated, compile-time region/prefix data from zz_generated_range_data.go
+	for ipInfo, prefixes := range regionToRanges {
+		for _, prefix := range prefixes {
+			t.Insert(prefix, ipInfo)
 		}
 	}
 	return t
 }
 
 // AllIPInfos returns a slice of all known results that a NewIPMapper could
-// return
+// return for testing purposes
 func AllIPInfos() []IPInfo {
-	r := make([]IPInfo, 0, len(regionToRanges))
-	for v := range regionToRanges {
-		r = append(r, v)
+	allIPInfos := make([]IPInfo, 0, len(regionToRanges))
+	for ipInfo := range regionToRanges {
+		allIPInfos = append(allIPInfos, ipInfo)
 	}
-	return r
+	return allIPInfos
 }
