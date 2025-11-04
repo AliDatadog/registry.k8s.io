@@ -275,10 +275,21 @@ func makeV2Handler(rc RegistryConfig, blobs blobChecker) func(w http.ResponseWri
 			return
 		}
 
-		// If the request is a blob or manifest request, forward it to a matching registry OR CDN
+		// If the request is a blob or manifest request from non-AWS, route based on type
 		if ipInfo.Cloud != cloudcidrs.AWS {
 			klog.V(2).Infof("cloud not aws: %v", ipInfo)
-			redirectURL, err := redirectUpstream(rc, rPath, ipInfo, rc.UpstreamCDN)
+			// For blobs, always use CDN for better edge caching
+			// For manifests from GCP/Azure, route to appropriate regional registry
+			isBlob := strings.Contains(rPath, "/blobs/")
+			var redirectURL string
+			var err error
+			if isBlob {
+				// Blobs go to CDN for better global distribution
+				redirectURL, err = redirectUpstream(rc, rPath, cloudcidrs.IPInfo{}, rc.UpstreamCDN)
+			} else {
+				// Manifests go to regional registry (GCP/Azure) or CDN (unknown)
+				redirectURL, err = redirectUpstream(rc, rPath, ipInfo, rc.UpstreamCDN)
+			}
 			if err != nil {
 				klog.ErrorS(err, "failed to build redirect URL")
 				http.Error(w, "Internal server error", http.StatusInternalServerError)
