@@ -21,7 +21,10 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"testing"
+
+	"k8s.io/registry.k8s.io/pkg/net/cloudcidrs"
 )
 
 func TestMakeHandler(t *testing.T) {
@@ -135,6 +138,16 @@ func (f *fakeBlobsChecker) BlobExistsWithContext(ctx context.Context, blobURL st
 	return f.knownURLs[blobURL]
 }
 
+// fakeIPMapper implements a test version of IPMapper with predetermined IP mappings
+type fakeIPMapper struct {
+	ipMap map[string]cloudcidrs.IPInfo
+}
+
+func (f *fakeIPMapper) GetIP(ip netip.Addr) (cloudcidrs.IPInfo, bool) {
+	info, ok := f.ipMap[ip.String()]
+	return info, ok
+}
+
 func TestMakeV2Handler(t *testing.T) {
 	// Build new registry config matching updated code
 	registryConfig := RegistryConfig{
@@ -149,6 +162,16 @@ func TestMakeV2Handler(t *testing.T) {
 
 	// Initialize the GCP region trie
 	gcpRegionTrie = newRegionTrie(registryConfig)
+
+	// Override regionMapper with a test version that has known test IPs
+	testMapper := &fakeIPMapper{
+		ipMap: map[string]cloudcidrs.IPInfo{
+			"10.0.0.1": {Cloud: cloudcidrs.AWS, Region: "us-east-1"},
+			"10.0.0.2": {Cloud: cloudcidrs.GCP, Region: "us-central1"},
+			"10.0.0.4": {Cloud: cloudcidrs.GCP, Region: "europe-west1"},
+		},
+	}
+	regionMapper = testMapper
 
 	blobs := fakeBlobsChecker{
 		knownURLs: map[string]bool{
@@ -239,8 +262,8 @@ func TestMakeV2Handler(t *testing.T) {
 			Name: "GCP EU -> EU GCR",
 			Request: func() *http.Request {
 				r := httptest.NewRequest("GET", "http://localhost:8080/v2/pause/manifests/latest", nil)
-				// Use a real GCP europe-west1 IP
-				r.RemoteAddr = "34.76.0.1:1234"
+				// Use test IP mapped to GCP europe-west1
+				r.RemoteAddr = "10.0.0.4:1234"
 				return r
 			}(),
 			ExpectedStatus: http.StatusTemporaryRedirect,
